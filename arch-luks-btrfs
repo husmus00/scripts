@@ -1,4 +1,35 @@
+#!/usr/bin/env bash
+
 # Assumes disks are partitioned
+
+set -euo pipefail
+
+# Check Wi-Fi connectivity
+if ! nmcli -t -f active,ssid dev wifi | grep -q "^yes:"; then
+    echo "Wi-Fi not connected."
+    exit 1
+fi
+
+if ! ping -q -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+    echo "No internet connectivity."
+    exit 1
+fi
+
+# Check NVMe partition layout
+if [[ ! -b /dev/nvme0n1 ]]; then
+    echo "/dev/nvme0n1 not found."
+    exit 1
+fi
+
+PART_COUNT=$(lsblk -no NAME /dev/nvme0n1 | grep -c '^nvme0n1p')
+if [[ "$PART_COUNT" -ne 2 ]]; then
+    echo "Expected 2 partitions on /dev/nvme0n1, found $PART_COUNT."
+    exit 1
+fi
+
+echo "All checks passed."
+
+# Now perform install
 
 export MY_DISK=/dev/nvme0n1
 export MY_ROOT=luksroot
