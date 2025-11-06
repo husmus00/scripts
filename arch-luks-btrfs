@@ -1,40 +1,26 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 export MY_DISK=/dev/nvme0n1
 export MY_ROOT=luksroot
 
-# Assumes disks are partitioned
-
-set -euo pipefail
-
-# Check if any Wi-Fi interface is up
-if ! ip link show | grep -q "wl.*state UP"; then
-    echo "Wi-Fi interface not connected or not up."
+if [[ ! -b "$MY_DISK" ]]; then
+    echo "Error: $MY_DISK is not a valid block device."
     exit 1
 fi
 
-# Check if internet connectivity works
-if ! ping -q -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
-    echo "No internet connectivity."
-    exit 1
-fi
+echo "This will ERASE all data on $MY_DISK!"
+read -rp "Type 'YES' to continue: " confirm
+[[ "$confirm" == "YES" ]] || exit 1
 
-# Check NVMe partition layout
-if [[ ! -b /dev/nvme0n1 ]]; then
-    echo "/dev/nvme0n1 not found."
-    exit 1
-fi
+sgdisk --zap-all "$MY_DISK"
+parted -s "$MY_DISK" mklabel gpt
+parted -s "$MY_DISK" mkpart ESP fat32 1MiB 2049MiB
+parted -s "$MY_DISK" set 1 esp on
+parted -s "$MY_DISK" mkpart primary 2049MiB 100%
 
-PART_COUNT=$(lsblk -no NAME /dev/nvme0n1 | grep -c '^nvme0n1p')
-if [[ "$PART_COUNT" -ne 2 ]]; then
-    echo "Expected 2 partitions on /dev/nvme0n1, found $PART_COUNT."
-    exit 1
-fi
-
-echo "All checks passed."
-
-# Now perform install
-
+lsblk "$MY_DISK"
 partprobe ${MY_DISK}
 
 sgdisk -p ${MY_DISK}
@@ -85,16 +71,45 @@ arch-chroot /mnt useradd -G sudo -m h
 arch-chroot /mnt passwd h
 arch-chroot /mnt passwd root
 
-arch-chroot /mnt visudo
+# Uncomment the "%sudo ALL=(ALL:ALL) ALL" line
+# arch-chroot /mnt visudo
+sed -i 's/^# *%sudo/%sudo/' /mnt/etc/sudoers
+arch-chroot /mnt visudo -c
 
+# Get UUID for luks partition
 export MY_UUID=$(blkid ${MY_DISK}p2 | sed -n 's/.*UUID="\([^"]*\)".*/\1/p')
 echo $MY_UUID
 
+# Configure /mnt/etc/cmdline.d/root.conf
 mkdir /mnt/etc/cmdline.d
 echo "rd.luks.name=${MY_UUID}=${MY_ROOT} root=/dev/mapper/${MY_ROOT} rootfstype=btrfs rootflags=subvol=/@ rw" > /mnt/etc/cmdline.d/root.conf
 
-vim /mnt/etc/mkinitcpio.conf
-vim /mnt/etc/mkinitcpio.d/linux.preset
+# Configure HOOKS in /etc/cmdline.d/root.conf
+# vim /mnt/etc/mkinitcpio.conf
+sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect keyboard sd-vconsole modconf block sd-encrypt filesystems)/' /mnt/etc/mkinitcpio.conf
+
+# Configure /mnt/etc/mkinitcpio.d/linux.preset
+# vim /mnt/etc/mkinitcpio.d/linux.preset
+cat > /mnt/etc/mkinitcpio.d/linux.preset <<'EOF'
+# mkinitcpio preset file for the 'linux' package
+
+ALL_config="/etc/mkinitcpio.conf"
+ALL_kver="/boot/vmlinuz-linux"
+ALL_microcode="/boot/intel-ucode.img"
+
+PRESETS=('default' 'fallback')
+
+#default_config="/etc/mkinitcpio.conf"
+#default_image="/boot/initramfs-linux.img"
+default_uki="/efi/EFI/Linux/arch-linux.efi"
+default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
+
+#fallback_config="/etc/mkinitcpio.conf"
+#fallback_image="/boot/initramfs-linux-fallback.img"
+fallback_uki="/efi/EFI/Linux/arch-linux-fallback.efi"
+fallback_options="-S autodetect"
+EOF
+
 
 mkdir -p /mnt/efi/EFI/Linux
 arch-chroot /mnt mkinitcpio -P
