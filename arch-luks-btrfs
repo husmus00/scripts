@@ -4,6 +4,10 @@ set -euo pipefail
 
 export MY_DISK=/dev/nvme0n1
 export MY_ROOT=luksroot
+export LOGFILE=arch_install.log
+
+# Redirect stdout and stderr to tee
+exec > >(tee -a "$LOGFILE") 2>&1
 
 if [[ ! -b "$MY_DISK" ]]; then
     echo "Error: $MY_DISK is not a valid block device."
@@ -109,7 +113,6 @@ default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
 fallback_uki="/efi/EFI/Linux/arch-linux-fallback.efi"
 fallback_options="-S autodetect"
 EOF
-
 
 mkdir -p /mnt/efi/EFI/Linux
 arch-chroot /mnt mkinitcpio -P
