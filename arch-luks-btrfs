@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+export MY_DISK=/dev/nvme0n1
+export MY_ROOT=luksroot
+
 # Assumes disks are partitioned
 
 set -euo pipefail
@@ -16,23 +19,20 @@ if ! ping -q -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
 fi
 
 # Check NVMe partition layout
-if [[ ! -b /dev/nvme0n1 ]]; then
-    echo "/dev/nvme0n1 not found."
+if [[ ! -b /dev/${MY_DISK} ]]; then
+    echo "/dev/${MY_DISK} not found."
     exit 1
 fi
 
-PART_COUNT=$(lsblk -no NAME /dev/nvme0n1 | grep -c '^nvme0n1p')
+PART_COUNT=$(lsblk -no NAME /dev/${MY_DISK} | grep -c '^${MY_DISK}')
 if [[ "$PART_COUNT" -ne 2 ]]; then
-    echo "Expected 2 partitions on /dev/nvme0n1, found $PART_COUNT."
+    echo "Expected 2 partitions on /dev/${MY_DISK}, found $PART_COUNT."
     exit 1
 fi
 
 echo "All checks passed."
 
 # Now perform install
-
-export MY_DISK=/dev/nvme0n1
-export MY_ROOT=luksroot
 
 partprobe $disk
 
