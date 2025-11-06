@@ -35,9 +35,9 @@ echo "All checks passed."
 
 # Now perform install
 
-partprobe $disk
+partprobe ${MY_DISK}
 
-sgdisk -p $disk
+sgdisk -p ${MY_DISK}
 cryptsetup luksFormat --type luks2 ${MY_DISK}p2
 
 cryptsetup open ${MY_DISK}p2 ${MY_ROOT}
@@ -66,7 +66,7 @@ mount -t btrfs -o subvol=@cache,compress-force=zstd:1 -m /dev/mapper/${MY_ROOT} 
 mount -t btrfs -o subvol=@log,compress-force=zstd:1 -m /dev/mapper/${MY_ROOT} /mnt/var/log
 mount -t btrfs -o subvol=@libvirt,compress-force=zstd:1 -m /dev/mapper/${MY_ROOT} /mnt/var/libvirt
 
-mount -m ${MY_DISK} /mnt/efi
+mount -m ${MY_DISK}p1 /mnt/efi
 
 reflector --country GB --age 24 --protocol http,https --sort rate --save /etc/pacman.d/mirrorlist
 
@@ -99,7 +99,7 @@ vim /mnt/etc/mkinitcpio.d/linux.preset
 mkdir -p /mnt/efi/EFI/Linux
 arch-chroot /mnt mkinitcpio -P
 
-objdump -s -k .cmdline /mnt/efi/EFI/Linux/arch-linux.efi
+objdump -s -j .cmdline /mnt/efi/EFI/Linux/arch-linux.efi
 ls -lR /mnt/efi
 
 systemctl --root /mnt enable systemd-resolved systemd-timesyncd NetworkManager
