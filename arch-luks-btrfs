@@ -90,7 +90,7 @@ echo "rd.luks.name=${MY_UUID}=${MY_ROOT} root=/dev/mapper/${MY_ROOT} rootfstype=
 
 # Configure HOOKS in /etc/cmdline.d/root.conf
 # vim /mnt/etc/mkinitcpio.conf
-sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect keyboard sd-vconsole modconf block sd-encrypt filesystems)/' /mnt/etc/mkinitcpio.conf
+sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole sd-encrypt block filesystems fsck)/' /mnt/etc/mkinitcpio.conf
 
 # Configure /mnt/etc/mkinitcpio.d/linux.preset
 # vim /mnt/etc/mkinitcpio.d/linux.preset
