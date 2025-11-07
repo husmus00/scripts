@@ -86,7 +86,7 @@ echo $MY_UUID
 
 # Configure /mnt/etc/cmdline.d/root.conf
 mkdir /mnt/etc/cmdline.d
-echo "rd.luks.name=${MY_UUID}=${MY_ROOT} root=/dev/mapper/${MY_ROOT} rootfstype=btrfs rootflags=subvol=/@ rw" > /mnt/etc/cmdline.d/root.conf
+echo "rd.luks.name=${MY_UUID}=${MY_ROOT} root=/dev/mapper/${MY_ROOT} rootfstype=btrfs rootflags=subvol=@ rw" > /mnt/etc/cmdline.d/root.conf
 
 # Configure HOOKS in /etc/cmdline.d/root.conf
 # vim /mnt/etc/mkinitcpio.conf
