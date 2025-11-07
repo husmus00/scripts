@@ -28,6 +28,8 @@ lsblk "$MY_DISK"
 partprobe ${MY_DISK}
 
 sgdisk -p ${MY_DISK}
+
+echo "Press Enter (Keep empty)"
 cryptsetup luksFormat --type luks2 ${MY_DISK}p2
 
 cryptsetup open ${MY_DISK}p2 ${MY_ROOT}
@@ -60,7 +62,8 @@ mount -m ${MY_DISK}p1 /mnt/efi
 
 reflector --country GB --age 24 --protocol http,https --sort rate --save /etc/pacman.d/mirrorlist
 
-pacstrap -K /mnt base base-devel linux linux-firmware intel-ucode vim nano nvim cryptsetup btrfs-progs dosfstools util-linux git unzip sbctl networkmanager sudo
+pacstrap -K /mnt base base-devel linux linux-firmware intel-ucode vim nano nvim cryptsetup btrfs-progs dosfstools util-linux \
+git unzip sbctl networkmanager sudo iwd wpa_supplicant wireless_tools dialog
 
 genfstab -U /mnt >> /mnt/etc/fstab
 cat /mnt/etc/fstab
@@ -72,19 +75,38 @@ arch-chroot /mnt locale-gen
 arch-chroot /mnt groupadd sudo
 arch-chroot /mnt useradd -G sudo -m h
 
-arch-chroot /mnt passwd h
-arch-chroot /mnt passwd root
+#echo "Enter password for h user:"
+#arch-chroot /mnt passwd h
+#echo "Enter password for root user:"
+#arch-chroot /mnt passwd root
+
+# Function to set password with retry
+set_password() {
+    local user=$1
+    local prompt=$2
+    while true; do
+        if arch-chroot /mnt passwd "$user"; then
+            break
+        else
+            echo "Password setting failed. Please try again."
+        fi
+    done
+}
+
+set_password h "Setting password for user h:"
+set_password root "Setting password for root:"
 
 # Uncomment the "%sudo ALL=(ALL:ALL) ALL" line
 # arch-chroot /mnt visudo
 sed -i 's/^# *%sudo/%sudo/' /mnt/etc/sudoers
 arch-chroot /mnt visudo -c
 
-# Get UUID for luks partition
-export MY_UUID=$(blkid ${MY_DISK}p2 | sed -n 's/.*UUID="\([^"]*\)".*/\1/p')
+echo "Getting UUID for luks partition ..."
+#export MY_UUID=$(blkid ${MY_DISK}p2 | sed -n 's/.*UUID="\([^"]*\)".*/\1/p')
+export MY_UUID=$(blkid -s UUID -o value ${MY_DISK}p2)
 echo $MY_UUID
 
-# Configure /mnt/etc/cmdline.d/root.conf
+echo "Configuring /mnt/etc/cmdline.d/root.conf ..."
 mkdir /mnt/etc/cmdline.d
 echo "rd.luks.name=${MY_UUID}=${MY_ROOT} root=/dev/mapper/${MY_ROOT} rootfstype=btrfs rootflags=subvol=@ rw" > /mnt/etc/cmdline.d/root.conf
 
@@ -120,7 +142,15 @@ arch-chroot /mnt mkinitcpio -P
 objdump -s -j .cmdline /mnt/efi/EFI/Linux/arch-linux.efi
 ls -lR /mnt/efi
 
-systemctl --root /mnt enable systemd-resolved systemd-timesyncd NetworkManager
+# Set up networking
+
+mkdir -p /mnt/etc/NetworkManager/conf.d
+cat > /mnt/etc/NetworkManager/conf.d/wifi_backend.conf <<EOF
+[device]
+wifi.backend=iwd
+EOF
+
+systemctl --root /mnt enable systemd-resolved systemd-timesyncd iwd NetworkManager
 systemctl --root /mnt mask systemd-networkd
 
 arch-chroot /mnt bootctl install --esp-path=/efi
