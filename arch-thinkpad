@@ -1,0 +1,4 @@
+# Thinkpad-specific configuration
+
+sudo pacman -S sof-firmware alsa-ucm-conf
+systemctl --user restart pipewire pipewire-pulse wireplumber
